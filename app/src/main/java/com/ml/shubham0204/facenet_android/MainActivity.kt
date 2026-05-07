@@ -12,6 +12,7 @@ import androidx.navigation.compose.rememberNavController
 import com.ml.shubham0204.facenet_android.presentation.screens.add_face.AddFaceScreen
 import com.ml.shubham0204.facenet_android.presentation.screens.detect_screen.DetectScreen
 import com.ml.shubham0204.facenet_android.presentation.screens.face_list.FaceListScreen
+import com.ml.shubham0204.facenet_android.presentation.screens.live_enroll.LiveEnrollScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,8 +32,10 @@ class MainActivity : ComponentActivity() {
                     FaceListScreen(
                         onNavigateBack = { navHostController.navigateUp() },
                         onAddFaceClick = { navHostController.navigate("add-face") },
+                        onEnrolFromCameraClick = { navHostController.navigate("live-enroll") },
                     )
                 }
+                composable("live-enroll") { LiveEnrollScreen { navHostController.navigateUp() } }
             }
         }
     }

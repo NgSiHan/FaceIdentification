@@ -132,6 +132,22 @@ class ImageVectorUseCase(
         return product / (mag1 * mag2)
     }
 
+    suspend fun addImageFromBitmap(
+        personID: Long,
+        personName: String,
+        faceBitmap: Bitmap,
+    ): Result<Boolean> {
+        val embedding = faceNet.getFaceEmbedding(faceBitmap)
+        imagesVectorDB.addFaceImageRecord(
+            FaceImageRecord(
+                personID = personID,
+                personName = personName,
+                faceEmbedding = embedding,
+            ),
+        )
+        return Result.success(true)
+    }
+
     fun removeImages(personID: Long) {
         imagesVectorDB.removeFaceRecordsWithPersonID(personID)
     }
