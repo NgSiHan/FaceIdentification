@@ -32,9 +32,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,9 +63,25 @@ fun FaceListScreen(
     onEnrolFromCameraClick: (() -> Unit),
 ) {
     var isMenuExpanded by remember { mutableStateOf(false) }
+    val viewModel: FaceListScreenViewModel = koinViewModel()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val removeError by viewModel.removeError
+    LaunchedEffect(removeError) {
+        if (removeError != null) {
+            snackbarHostState.showSnackbar(removeError!!)
+            viewModel.removeError.value = null
+        }
+    }
+
     FaceNetAndroidTheme {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            snackbarHost = {
+                SnackbarHost(hostState = snackbarHostState) { data ->
+                    Snackbar(snackbarData = data, containerColor = MaterialTheme.colorScheme.errorContainer)
+                }
+            },
             topBar = {
                 TopAppBar(
                     title = {
@@ -76,7 +96,7 @@ fun FaceListScreen(
                         }
                     },
 
-                )
+                    )
             },
             floatingActionButton = {
                 Column(
@@ -119,7 +139,6 @@ fun FaceListScreen(
                 }
             },
         ) { innerPadding ->
-            val viewModel: FaceListScreenViewModel = koinViewModel()
             Column(modifier = Modifier.padding(innerPadding)) {
                 ScreenUI(viewModel)
                 AppAlertDialog()
@@ -163,7 +182,7 @@ private fun FaceListItem(
                         dialogTitle = "Remove person",
                         dialogText =
                             "Are you sure to remove this person from the database. The face for this person will not " +
-                                "be detected in realtime",
+                                    "be detected in realtime",
                         dialogPositiveButtonText = "Remove",
                         onPositiveButtonClick = onRemoveFaceClick,
                         dialogNegativeButtonText = "Cancel",

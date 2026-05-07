@@ -1,7 +1,10 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.jetbrains.kotlin.serialization)
     id("com.google.devtools.ksp")
 }
 
@@ -20,6 +23,12 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val localProps = Properties().apply {
+            rootProject.file("local.properties").takeIf { it.exists() }?.let { load(it.inputStream()) }
+        }
+        buildConfigField("String", "SUPABASE_URL", "\"${localProps.getProperty("SUPABASE_URL", "")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProps.getProperty("SUPABASE_ANON_KEY", "")}\"")
     }
 
     signingConfigs {
@@ -50,10 +59,13 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/INDEX.LIST"
+            excludes += "/META-INF/io.netty.versions.properties"
         }
     }
     applicationVariants.configureEach {
@@ -85,6 +97,11 @@ dependencies {
     // ObjectBox - vector database
     debugImplementation("io.objectbox:objectbox-android-objectbrowser:4.0.0")
     releaseImplementation("io.objectbox:objectbox-android:4.0.0")
+
+    // Supabase
+    implementation(platform("io.github.jan-tennert.supabase:bom:2.6.1"))
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.ktor:ktor-client-android:2.3.12")
 
     // dependency injection
     implementation(libs.koin.android)

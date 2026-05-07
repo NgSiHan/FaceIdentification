@@ -7,8 +7,8 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
-import com.ml.shubham0204.facenet_android.domain.ImageVectorUseCase
-import com.ml.shubham0204.facenet_android.domain.PersonUseCase
+import com.ml.shubham0204.facenet_android.data.FaceRepository
+import com.ml.shubham0204.facenet_android.domain.embeddings.FaceNet
 import com.ml.shubham0204.facenet_android.domain.face_detection.BaseFaceDetector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,8 +19,8 @@ import org.koin.android.annotation.KoinViewModel
 @KoinViewModel
 class LiveEnrollScreenViewModel(
     val faceDetector: BaseFaceDetector,
-    private val personUseCase: PersonUseCase,
-    private val imageVectorUseCase: ImageVectorUseCase,
+    private val faceNet: FaceNet,
+    private val faceRepository: FaceRepository,
 ) : ViewModel() {
     val latestDetection: MutableState<Pair<Bitmap, Rect>?> = mutableStateOf(null)
     val isFrozen: MutableState<Boolean> = mutableStateOf(false)
@@ -45,16 +45,24 @@ class LiveEnrollScreenViewModel(
         if (name.isEmpty()) return
         isSaving.value = true
         CoroutineScope(Dispatchers.Default).launch {
-            val personID = personUseCase.addPerson(name, 1L)
-            imageVectorUseCase.addImageFromBitmap(personID, name, faceBitmap)
-            withContext(Dispatchers.Main) {
-                isSaving.value = false
-                showNameDialog.value = false
-                personNameInput.value = ""
-                isFrozen.value = false
-                latestDetection.value = null
-                snackbarMessage.value = "Enrolled \"$name\" successfully"
-            }
+            val embedding = faceNet.getFaceEmbedding(faceBitmap)
+            faceRepository.enrol(name, embedding)
+                .onSuccess {
+                    withContext(Dispatchers.Main) {
+                        isSaving.value = false
+                        showNameDialog.value = false
+                        personNameInput.value = ""
+                        isFrozen.value = false
+                        latestDetection.value = null
+                        snackbarMessage.value = "Enrolled \"$name\" successfully"
+                    }
+                }
+                .onFailure { error ->
+                    withContext(Dispatchers.Main) {
+                        isSaving.value = false
+                        snackbarMessage.value = "Enrolment failed: ${error.message}"
+                    }
+                }
         }
     }
 

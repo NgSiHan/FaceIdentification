@@ -19,6 +19,7 @@ data class FaceImageRecord(
         dimensions = 512,
         distanceType = VectorDistanceType.COSINE,
     ) var faceEmbedding: FloatArray = floatArrayOf(),
+    var remoteId: String? = null,
 )
 
 @Entity
@@ -31,6 +32,7 @@ data class PersonRecord(
     var numImages: Long = 0,
     // time when the record was added
     var addTime: Long = 0,
+    var remotePersonId: String? = null,
 )
 
 data class RecognitionMetrics(

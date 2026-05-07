@@ -77,6 +77,16 @@ class ImagesVectorDB {
         return product / (mag1 * mag2)
     }
 
+    fun getAllRemoteIds(): Set<String> =
+        imagesBox.all.mapNotNull { it.remoteId }.toSet()
+
+    fun getRemoteIdsByPersonId(personID: Long): List<String> =
+        imagesBox
+            .query(FaceImageRecord_.personID.equal(personID))
+            .build()
+            .find()
+            .mapNotNull { it.remoteId }
+
     fun removeFaceRecordsWithPersonID(personID: Long) {
         imagesBox.removeByIds(
             imagesBox

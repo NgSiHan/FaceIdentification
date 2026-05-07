@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.net.Uri
 import com.ml.shubham0204.facenet_android.data.FaceImageRecord
+import com.ml.shubham0204.facenet_android.data.FaceRepository
 import com.ml.shubham0204.facenet_android.data.ImagesVectorDB
 import com.ml.shubham0204.facenet_android.data.RecognitionMetrics
 import com.ml.shubham0204.facenet_android.domain.embeddings.FaceNet
@@ -22,6 +23,7 @@ class ImageVectorUseCase(
     private val faceSpoofDetector: FaceSpoofDetector,
     private val imagesVectorDB: ImagesVectorDB,
     private val faceNet: FaceNet,
+    private val faceRepository: FaceRepository,
 ) {
     data class FaceRecognitionResult(
         val personName: String,
@@ -75,7 +77,7 @@ class ImageVectorUseCase(
             avgT2 += t2.toLong(DurationUnit.MILLISECONDS)
             // Perform nearest-neighbor search
             val (recognitionResult, t3) =
-                measureTimedValue { imagesVectorDB.getNearestEmbeddingPersonName(embedding, flatSearch) }
+                measureTimedValue { faceRepository.identify(embedding, flatSearch) }
             avgT3 += t3.toLong(DurationUnit.MILLISECONDS)
             if (recognitionResult == null) {
                 faceRecognitionResults.add(FaceRecognitionResult("Not recognized", boundingBox))

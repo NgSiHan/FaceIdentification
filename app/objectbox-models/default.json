@@ -5,7 +5,7 @@
   "entities": [
     {
       "id": "1:7886976431312498614",
-      "lastPropertyId": "4:1044002615928688033",
+      "lastPropertyId": "5:578256045314210799",
       "name": "FaceImageRecord",
       "properties": [
         {
@@ -32,13 +32,18 @@
           "indexId": "2:1210613089703466990",
           "type": 28,
           "flags": 8
+        },
+        {
+          "id": "5:578256045314210799",
+          "name": "remoteId",
+          "type": 9
         }
       ],
       "relations": []
     },
     {
       "id": "2:5724033975412775664",
-      "lastPropertyId": "5:6214334937147888472",
+      "lastPropertyId": "6:9040873343552493170",
       "name": "PersonRecord",
       "properties": [
         {
@@ -61,6 +66,11 @@
           "id": "5:6214334937147888472",
           "name": "addTime",
           "type": 6
+        },
+        {
+          "id": "6:9040873343552493170",
+          "name": "remotePersonId",
+          "type": 9
         }
       ],
       "relations": []

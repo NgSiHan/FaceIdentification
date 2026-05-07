@@ -1,6 +1,7 @@
 package com.ml.shubham0204.facenet_android.data
 
 import io.objectbox.kotlin.flow
+import io.objectbox.query.QueryBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,14 @@ class PersonDB {
 
     // Returns the number of records present in the collection
     fun getCount(): Long = personBox.count()
+
+    fun getById(personID: Long): PersonRecord? = personBox.get(personID)
+
+    fun getByName(name: String): PersonRecord? =
+        personBox
+            .query(PersonRecord_.personName.equal(name, QueryBuilder.StringOrder.CASE_SENSITIVE))
+            .build()
+            .findFirst()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun getAll(): Flow<MutableList<PersonRecord>> =

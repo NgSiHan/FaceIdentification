@@ -4,18 +4,29 @@ import androidx.camera.core.CameraSelector
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.ml.shubham0204.facenet_android.data.FaceRepository
 import com.ml.shubham0204.facenet_android.data.RecognitionMetrics
 import com.ml.shubham0204.facenet_android.data.SettingsStore
 import com.ml.shubham0204.facenet_android.domain.ImageVectorUseCase
 import com.ml.shubham0204.facenet_android.domain.PersonUseCase
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.koin.android.annotation.KoinViewModel
 
 @KoinViewModel
 class DetectScreenViewModel(
     val personUseCase: PersonUseCase,
     val imageVectorUseCase: ImageVectorUseCase,
-    val settingsStore: SettingsStore
+    val settingsStore: SettingsStore,
+    private val faceRepository: FaceRepository,
 ) : ViewModel() {
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            faceRepository.syncFromRemote()
+        }
+    }
     private val KEY_SETTINGS_CAMERA_FACING = "camera_facing"
     private val CAMERA_FACING_VALUE_BACK = "back"
     private val CAMERA_FACING_VALUE_FRONT = "front"
