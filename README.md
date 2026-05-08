@@ -2,6 +2,14 @@
 
 > A simple Android app that performs on-device face recognition by comparing FaceNet embeddings against a vector database of user-given faces
 
+This is a fork of [shubham0204/OnDevice-Face-Recognition-Android](https://github.com/shubham0204/OnDevice-Face-Recognition-Android).
+The following changes have been made on top of the original project:
+
+- **Live camera enrolment**: persons can now be enrolled directly from the live camera feed, in addition to the existing photo gallery enrolment flow
+- **Supabase remote sync**: face embeddings are synced to a shared Supabase (PostgreSQL + pgvector) database, allowing enrolled faces to be recognised across multiple devices
+- **Offline-first architecture**: ObjectBox remains the local cache; identification runs fully on-device with no network dependency. Supabase is used for enrolment writes and startup sync only.
+---
+
 <img src="https://github.com/user-attachments/assets/3a79776c-e5dd-48c3-8b84-6ec3eaf32d2f" width="80%"/>
 
 <img src="https://github.com/user-attachments/assets/2bbdb033-e709-40f1-8326-1634768e5a3c" width="80%"/>
@@ -144,6 +152,91 @@ class AppModule {
         MediapipeFaceDetector(context)
     }
 }
+```
+## **(ADDED)** Supabase Setup
+
+Face embeddings are synced to a remote [Supabase](https://supabase.com) database using the `pgvector` extension for vector similarity storage. Follow the steps below to configure the Supabase project.
+
+### 1. Create a Supabase project
+
+### 2. Run the database schema
+
+In the Supabase dashboard, go to **SQL Editor → New query**, paste the following, and click **Run**:
+
+```sql
+-- Enable vector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+ 
+-- Persons table
+CREATE TABLE persons (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT        NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+ 
+-- Face embeddings table
+-- Change vector(512) to vector(128) if using the 128-dim FaceNet model
+CREATE TABLE face_embeddings (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  person_id   UUID        REFERENCES persons(id) ON DELETE CASCADE,
+  embedding   vector(512),
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+ 
+-- ANN index for fast cosine similarity search
+CREATE INDEX ON face_embeddings
+  USING ivfflat (embedding vector_cosine_ops)
+  WITH (lists = 100);
+ 
+-- RPC function called by the app for server-side identification
+CREATE OR REPLACE FUNCTION identify_face(
+  query_embedding vector(512),
+  match_threshold float DEFAULT 0.7
+)
+RETURNS TABLE(person_name text, similarity float) AS $$
+  SELECT p.name, 1 - (fe.embedding <=> query_embedding) AS similarity
+  FROM face_embeddings fe
+  JOIN persons p ON fe.person_id = p.id
+  ORDER BY fe.embedding <=> query_embedding
+  LIMIT 1;
+$$ LANGUAGE sql;
+```
+
+> **Note:** If you are using the 128-dimensional FaceNet model (`facenet.tflite`), replace `vector(512)` with `vector(128)` in both the table definition and the function signature. The active model is set in `FaceNet.kt`.
+
+### 3. Configure Row Level Security (RLS)
+
+The policies below allow all operations for development purposes. For production builds, replace these with auth-based policies.
+
+```sql
+ALTER TABLE persons         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE face_embeddings ENABLE ROW LEVEL SECURITY;
+ 
+CREATE POLICY "allow_all" ON persons         FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "allow_all" ON face_embeddings FOR ALL USING (true) WITH CHECK (true);
+```
+### 4. Grant table access to the anon role
+
+RLS policies control *which rows* the `anon` role can access, but Postgres also requires an explicit permission grant before the role can touch a table at all. Without this step, API requests will fail with a permission error.
+
+```sql
+-- Allow the anon role to see the public schema
+GRANT USAGE ON SCHEMA public TO anon;
+ 
+-- Grant required permissions on each table
+GRANT SELECT, INSERT, DELETE ON TABLE public.persons         TO anon;
+GRANT SELECT, INSERT, DELETE ON TABLE public.face_embeddings TO anon;
+```
+
+### 5. Add credentials to the project
+
+In the Supabase dashboard, go to **Project Settings → API Keys** and copy your **Project URL** and **Publishable key** (`sb_publishable_...`).
+
+Add these to `local.properties` in the project root (this file is `.gitignore`d by default and must not be committed):
+
+```properties
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_xxxxxxxxxxxxxxxxxxxx
 ```
 
 ## Working
