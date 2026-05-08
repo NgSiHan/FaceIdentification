@@ -13,26 +13,40 @@ class FaceRepository(
     /**
      * Remote-first enrolment.
      * Writes to Supabase first to obtain UUIDs, then writes to ObjectBox with those UUIDs.
-     * Returns Result.failure if the remote write fails — no ObjectBox write occurs in that case.
+     * Returns Result.failure if the remote write fails. No ObjectBox write occurs in that case.
      */
     suspend fun enrol(name: String, embedding: FloatArray): Result<Unit> = try {
-        val enrolResult = remoteDataSource.enrollPerson(name, embedding)
-        val personID = personDB.addPerson(
-            PersonRecord(
-                personName = name,
-                numImages = 1L,
-                addTime = System.currentTimeMillis(),
-                remotePersonId = enrolResult.personId,
-            ),
-        )
-        imagesVectorDB.addFaceImageRecord(
-            FaceImageRecord(
-                personID = personID,
-                personName = name,
-                faceEmbedding = embedding,
-                remoteId = enrolResult.embeddingId,
-            ),
-        )
+        val existingPerson = personDB.getByName(name)
+        val remotePersonId = existingPerson?.remotePersonId
+        if (remotePersonId != null) {
+            val embeddingId = remoteDataSource.addEmbedding(remotePersonId, embedding)
+            imagesVectorDB.addFaceImageRecord(
+                FaceImageRecord(
+                    personID = existingPerson.personID,
+                    personName = name,
+                    faceEmbedding = embedding,
+                    remoteId = embeddingId,
+                ),
+            )
+        } else {
+            val enrolResult = remoteDataSource.enrollPerson(name, embedding)
+            val personID = personDB.addPerson(
+                PersonRecord(
+                    personName = name,
+                    numImages = 1L,
+                    addTime = enrolResult.personCreatedAt,
+                    remotePersonId = enrolResult.personId,
+                ),
+            )
+            imagesVectorDB.addFaceImageRecord(
+                FaceImageRecord(
+                    personID = personID,
+                    personName = name,
+                    faceEmbedding = embedding,
+                    remoteId = enrolResult.embeddingId,
+                ),
+            )
+        }
         Result.success(Unit)
     } catch (e: Exception) {
         Result.failure(e)
@@ -40,7 +54,7 @@ class FaceRepository(
 
     /**
      * Pure pass-through to the local ObjectBox HNSW nearest-neighbour search.
-     * No network call — identification is always local.
+     * No network call, identification is always local.
      */
     fun identify(embedding: FloatArray, flatSearch: Boolean): FaceImageRecord? =
         imagesVectorDB.getNearestEmbeddingPersonName(embedding, flatSearch)
@@ -49,7 +63,7 @@ class FaceRepository(
      * Remote-first deletion.
      * Deletes from Supabase first; only removes from ObjectBox if remote succeeds (or person
      * has no remotePersonId, meaning it was enrolled locally without Supabase).
-     * Returns Result.failure if the remote delete fails — ObjectBox is NOT touched in that case.
+     * Returns Result.failure if the remote delete fails. ObjectBox is NOT touched in that case.
      */
     suspend fun remove(personID: Long): Result<Unit> = try {
         val person = personDB.getById(personID)
@@ -81,7 +95,7 @@ class FaceRepository(
                         PersonRecord(
                             personName = record.personName,
                             numImages = 1L,
-                            addTime = System.currentTimeMillis(),
+                            addTime = record.personCreatedAt,
                             remotePersonId = record.personId,
                         ),
                     )

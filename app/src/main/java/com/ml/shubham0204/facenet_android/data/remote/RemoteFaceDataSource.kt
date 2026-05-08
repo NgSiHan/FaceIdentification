@@ -11,7 +11,10 @@ import org.koin.core.annotation.Single
 private data class PersonInsert(val name: String)
 
 @Serializable
-private data class PersonResponse(val id: String)
+private data class PersonResponse(
+    val id: String,
+    @SerialName("created_at") val createdAt: String,
+)
 
 @Serializable
 private data class EmbeddingInsert(
@@ -32,9 +35,15 @@ data class RemoteEmbeddingRecord(
     val persons: PersonName,
 ) {
     @Serializable
-    data class PersonName(val name: String)
+    data class PersonName(
+        val name: String,
+        @SerialName("created_at") val createdAt: String,
+    )
 
     val personName: String get() = persons.name
+
+    val personCreatedAt: Long get() =
+        java.time.OffsetDateTime.parse(persons.createdAt).toInstant().toEpochMilli()
 
     fun toFloatArray(): FloatArray =
         embedding
@@ -44,7 +53,7 @@ data class RemoteEmbeddingRecord(
             .toFloatArray()
 }
 
-data class EnrolResult(val personId: String, val embeddingId: String)
+data class EnrolResult(val personId: String, val embeddingId: String, val personCreatedAt: Long)
 
 @Single
 class RemoteFaceDataSource(private val supabaseClient: SupabaseClient) {
@@ -52,7 +61,7 @@ class RemoteFaceDataSource(private val supabaseClient: SupabaseClient) {
     /**
      * Inserts a person row, then a face_embedding row.
      * Returns EnrolResult with both the persons UUID and face_embeddings UUID.
-     * Throws on any network or server error — caller should wrap in try/catch.
+     * Throws on any network or server error, caller should wrap in try/catch.
      */
     suspend fun enrollPerson(name: String, embedding: FloatArray): EnrolResult {
         val person = supabaseClient
@@ -67,13 +76,30 @@ class RemoteFaceDataSource(private val supabaseClient: SupabaseClient) {
             .insert(EmbeddingInsert(personId = person.id, embedding = embeddingStr)) { select() }
             .decodeSingle<EmbeddingResponse>()
 
-        return EnrolResult(personId = person.id, embeddingId = record.id)
+        return EnrolResult(
+            personId = person.id,
+            embeddingId = record.id,
+            personCreatedAt = java.time.OffsetDateTime.parse(person.createdAt).toInstant().toEpochMilli(),
+        )
+    }
+
+    /**
+     * Inserts a face_embedding row for an already-existing person.
+     * Returns the new embedding's UUID.
+     */
+    suspend fun addEmbedding(personId: String, embedding: FloatArray): String {
+        val embeddingStr = embedding.joinToString(separator = ",", prefix = "[", postfix = "]")
+        return supabaseClient
+            .from("face_embeddings")
+            .insert(EmbeddingInsert(personId = personId, embedding = embeddingStr)) { select() }
+            .decodeSingle<EmbeddingResponse>()
+            .id
     }
 
     /**
      * Deletes all face_embedding rows by their UUIDs, then deletes the person row.
      * Embeddings are deleted first to avoid FK constraint violations.
-     * Throws on any network or server error — caller should wrap in try/catch.
+     * Throws on any network or server error, caller should wrap in try/catch.
      */
     suspend fun deletePerson(remotePersonId: String, embeddingIds: List<String>) {
         for (id in embeddingIds) {
@@ -93,6 +119,6 @@ class RemoteFaceDataSource(private val supabaseClient: SupabaseClient) {
     suspend fun fetchAllEmbeddings(): List<RemoteEmbeddingRecord> =
         supabaseClient
             .from("face_embeddings")
-            .select(Columns.raw("id, person_id, embedding, persons(name)"))
+            .select(Columns.raw("id, person_id, embedding, persons(name, created_at)"))
             .decodeList()
 }

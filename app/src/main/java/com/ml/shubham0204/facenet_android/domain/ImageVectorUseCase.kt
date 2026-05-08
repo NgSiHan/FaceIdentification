@@ -33,24 +33,13 @@ class ImageVectorUseCase(
 
     // Add the person's image to the database
     suspend fun addImage(
-        personID: Long,
         personName: String,
         imageUri: Uri,
     ): Result<Boolean> {
-        // Perform face-detection and get the cropped face as a Bitmap
         val faceDetectionResult = faceDetector.getCroppedFace(imageUri)
         if (faceDetectionResult.isSuccess) {
-            // Get the embedding for the cropped face, and store it
-            // in the database, along with `personId` and `personName`
             val embedding = faceNet.getFaceEmbedding(faceDetectionResult.getOrNull()!!)
-            imagesVectorDB.addFaceImageRecord(
-                FaceImageRecord(
-                    personID = personID,
-                    personName = personName,
-                    faceEmbedding = embedding,
-                ),
-            )
-            return Result.success(true)
+            return faceRepository.enrol(personName, embedding).map { true }
         } else {
             return Result.failure(faceDetectionResult.exceptionOrNull()!!)
         }
